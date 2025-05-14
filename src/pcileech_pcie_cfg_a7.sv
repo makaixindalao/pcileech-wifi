@@ -383,7 +383,7 @@ module pcileech_pcie_cfg_a7(
                     if ( ~in_cmd_read & ~in_cmd_write & ~rw[RWPOS_CFG_RD_EN] & ~rw[RWPOS_CFG_WR_EN] & ~rwi_cfg_mgmt_rd_en & ~rwi_cfg_mgmt_wr_en )
                         begin
                             rw[RWPOS_CFG_RD_EN] <= 1'b1;
-                            rw[169:160] <= 4;                                   // cfg_mgmt_dwaddr
+                            rw[169:160] <= 6;                                   // cfg_mgmt_dwaddr
                             rw[172]     <= 0;                                   // cfg_mgmt_byte_en
                             rw[173]     <= 0;                                   // cfg_mgmt_byte_en
                             rw[174]     <= 0;                                   // cfg_mgmt_byte_en
@@ -397,7 +397,7 @@ module pcileech_pcie_cfg_a7(
                         // if BAR0 was requested, lets save it.
                         //
                         if ((base_address_register_reg == 32'h00000000) | (base_address_register_reg == 32'hFFFFF004))
-                            if ((ctx.cfg_mgmt_dwaddr == 8'h04) & rwi_cfg_mgmt_rd_en)
+                            if ((ctx.cfg_mgmt_dwaddr == 8'h06) & rwi_cfg_mgmt_rd_en)
                                     base_address_register_reg <= ctx.cfg_mgmt_do;
 
 
