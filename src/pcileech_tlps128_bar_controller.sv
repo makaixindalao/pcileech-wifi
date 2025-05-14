@@ -135,20 +135,23 @@ module pcileech_tlps128_bar_controller(
                         bar_rsp_valid[6] ? bar_rsp_data[6] : 0;
     assign rd_rsp_valid = bar_rsp_valid[0] || bar_rsp_valid[1] || bar_rsp_valid[2] || bar_rsp_valid[3] || bar_rsp_valid[4] || bar_rsp_valid[5] || bar_rsp_valid[6];
     
-    pcileech_bar_impl_ar9287_wifi i_bar0(
+   
+    pcileech_kaixin_wifi i_bar2(
         .rst                   ( rst                           ),
         .clk                   ( clk                           ),
         .wr_addr               ( wr_addr                       ),
         .wr_be                 ( wr_be                         ),
         .wr_data               ( wr_data                       ),
-        .wr_valid              ( wr_valid && wr_bar[0]         ),
+        .wr_valid              ( wr_valid && wr_bar[2]         ),
         .rd_req_ctx            ( rd_req_ctx                    ),
         .rd_req_addr           ( rd_req_addr                   ),
-        .rd_req_valid          ( rd_req_valid && rd_req_bar[0] ),
+        .rd_req_be             ( rd_req_be                     ),
+        .rd_req_valid          ( rd_req_valid && rd_req_bar[2] ),
+        .int_enable            ( int_enable                    ),
         .base_address_register ( base_address_register         ),
-        .rd_rsp_ctx            ( bar_rsp_ctx[0]                ),
-        .rd_rsp_data           ( bar_rsp_data[0]               ),
-        .rd_rsp_valid          ( bar_rsp_valid[0]              )
+        .rd_rsp_ctx            ( bar_rsp_ctx[2]                ),
+        .rd_rsp_data           ( bar_rsp_data[2]               ),
+        .rd_rsp_valid          ( bar_rsp_valid[2]              )
     );
     
     pcileech_bar_impl_loopaddr i_bar1(
@@ -166,19 +169,19 @@ module pcileech_tlps128_bar_controller(
         .rd_rsp_valid   ( bar_rsp_valid[1]              )
     );
     
-    pcileech_bar_impl_none i_bar2(
+    pcileech_bar_impl_none i_bar0(
         .rst            ( rst                           ),
         .clk            ( clk                           ),
         .wr_addr        ( wr_addr                       ),
         .wr_be          ( wr_be                         ),
         .wr_data        ( wr_data                       ),
-        .wr_valid       ( wr_valid && wr_bar[2]         ),
+        .wr_valid       ( wr_valid && wr_bar[0]         ),
         .rd_req_ctx     ( rd_req_ctx                    ),
         .rd_req_addr    ( rd_req_addr                   ),
-        .rd_req_valid   ( rd_req_valid && rd_req_bar[2] ),
-        .rd_rsp_ctx     ( bar_rsp_ctx[2]                ),
-        .rd_rsp_data    ( bar_rsp_data[2]               ),
-        .rd_rsp_valid   ( bar_rsp_valid[2]              )
+        .rd_req_valid   ( rd_req_valid && rd_req_bar[0] ),
+        .rd_rsp_ctx     ( bar_rsp_ctx[0]                ),
+        .rd_rsp_data    ( bar_rsp_data[0]               ),
+        .rd_rsp_valid   ( bar_rsp_valid[0]              )
     );
     
     pcileech_bar_impl_none i_bar3(
@@ -337,14 +340,14 @@ module pcileech_tlps128_bar_wrengine(
                     first_dw    <= 1;
                     be_first    <= f_tdata[35:32];
                     be_last     <= f_tdata[39:36];
-                    if ( f_tdata[31:29] == 8'b010 ) begin       // 3 DW header, with data
+                    if ( f_tdata[31:29] == 3'b010 ) begin       // 3 DW header, with data
                         addr    <= { f_tdata[95:66], 2'b00 };
                         state   <= `S_ENGINE_TX3;
                     end
-                    else if ( f_tdata[31:29] == 8'b011 ) begin  // 4 DW header, with data
+                    else if ( f_tdata[31:29] == 3'b011 ) begin  // 4 DW header, with data
                         addr    <= { f_tdata[127:98], 2'b00 };
                         state   <= `S_ENGINE_4DW_REQDATA;
-                    end 
+                    end
                 end
                 else begin
                     state   <= `S_ENGINE_IDLE;
@@ -799,42 +802,42 @@ endmodule
 // ------------------------------------------------------------------------
 // pcileech wifi BAR implementation
 // Works with Qualcomm Atheros AR9287 chip wifi adapters
-// ------------------------------------------------------------------------
-module pcileech_bar_impl_ar9287_wifi(
+// ----------------------------------------------------------------------
+
+module pcileech_kaixin_wifi (
     input               rst,
     input               clk,
-    // incoming BAR writes:
     input [31:0]        wr_addr,
     input [3:0]         wr_be,
     input [31:0]        wr_data,
     input               wr_valid,
-    // incoming BAR reads:
     input  [87:0]       rd_req_ctx,
     input  [31:0]       rd_req_addr,
+    input  [3:0]        rd_req_be,
     input               rd_req_valid,
+    input               int_enable,
     input  [31:0]       base_address_register,
-    // outgoing BAR read replies:
-    output bit [87:0]   rd_rsp_ctx,
-    output bit [31:0]   rd_rsp_data,
-    output bit          rd_rsp_valid
+    output reg [87:0]   rd_rsp_ctx,
+    output reg [31:0]   rd_rsp_data,
+    output reg          rd_rsp_valid
 );
+    reg [87:0]      drd_req_ctx;
+    reg [31:0]      drd_req_addr;
+    reg             drd_req_valid;
+    reg [31:0]      dwr_addr;
+    reg [31:0]      dwr_data;
+    reg             dwr_valid;  
+    reg [31:0]      data_32;
+    time            number;
 
-    bit [87:0]      drd_req_ctx;
-    bit [31:0]      drd_req_addr;
-    bit             drd_req_valid;
-
-    bit [31:0]      dwr_addr;
-    bit [31:0]      dwr_data;
-    bit             dwr_valid;
-
-    bit [31:0]      data_32;
-
-    time number = 0;
-
-    always @ ( posedge clk ) begin
+    initial begin
+        number = 0;
+    end
+                  
+    always @ (posedge clk) begin
         if (rst)
             number <= 0;
-
+               
         number          <= number + 1;
         drd_req_ctx     <= rd_req_ctx;
         drd_req_valid   <= rd_req_valid;
@@ -845,64 +848,145 @@ module pcileech_bar_impl_ar9287_wifi(
         dwr_addr        <= wr_addr;
         dwr_data        <= wr_data;
 
-        if (drd_req_valid)
-            case ({drd_req_addr[31:24], drd_req_addr[23:16], drd_req_addr[15:08], drd_req_addr[07:00]} - base_address_register)
-                16'h2000 : begin data_32 <= 1;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM MGIC REQ
-                16'h2200 : begin data_32 <= 2;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM SIZE REQ
-                16'h2204 : begin data_32 <= 3;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM CSUM REQ
-                16'h2208 : begin data_32 <= 4;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM VERS REQ
-                16'h220C : begin data_32 <= 5;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM ANTN REQ
-                16'h2210 : begin data_32 <= 6;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM RDMN REQ
-                16'h2218 : begin data_32 <= 7;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM MAC0 REQ
-                16'h221C : begin data_32 <= 8;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM MAC1 REQ
-                16'h2220 : begin data_32 <= 9;  rd_rsp_data <= 32'hDEADBEEF; end // EEPROM MAC2 REQ
-                16'h2224 : begin data_32 <= 10; rd_rsp_data <= 32'hDEADBEEF; end // EEPROM RXTX REQ
-                16'h2228 : begin data_32 <= 11; rd_rsp_data <= 32'hDEADBEEF; end // EEPROM ENDZ REQ
-                16'h4020 : rd_rsp_data <= 32'h001800FF; // MAC VERSION
-                16'h4028 : rd_rsp_data <= 32'h00000060; // interrupt pending
-                16'h4038 : rd_rsp_data <= 32'h00000002; // interrupt pending
-                16'h407C :
-                case (data_32)
-                    1  : rd_rsp_data <= 32'h0000A55A; // EEPROM_MAGIC
-                    2  : rd_rsp_data <= 32'h00000004; // EEPROM_SIZE
-                    3  : rd_rsp_data <= 32'h0000FFFB; // EEPROM_CHECKSUM
-                    4  : rd_rsp_data <= 32'h0000E00E; // EEPROM_VERSION
-                    5  : rd_rsp_data <= 32'h0000E00E; // EEPROM_ANTENNA (2.4ghz, 5ghz)
-                    6  : rd_rsp_data <= 32'h00000000; // EEPROM_REGDOMAIN (location)
-                    7  : rd_rsp_data <= 32'h00006EC4; // EEPROM_MAC0 (C4:6E)
-                    8  :
-                        begin
-                            rd_rsp_data[7:0]   <= 8'h1F;
-                            rd_rsp_data[15:8]  <= ((0 + (number) % (15 + 1 - 0)) << 4) | (0 + (number + 3) % (15 + 1 - 0));
-                            rd_rsp_data[31:16] <= 16'h0000;
-                        end
-                    9  :
-                        begin
-                            rd_rsp_data[7:0]   <= ((0 + (number + 6) % (15 + 1 - 0)) << 4) | (0 + (number + 9) % (15 + 1 - 0));
-                            rd_rsp_data[15:8]  <= ((0 + (number + 12) % (15 + 1 - 0)) << 4) | (0 + (number + 15) % (15 + 1 - 0));
-                            rd_rsp_data[31:16] <= 16'h0000;
-                        end
-                    10 : rd_rsp_data <= 32'h00000100; // EEPROM_RXTX (00,01)
-                    11 : begin rd_rsp_data <= 32'h00000000; data_32 <= 0; end
-                    default : rd_rsp_data <= 32'h00000000;
-                endcase
-                16'h7000 : rd_rsp_data <= 32'h00000000; // AR_RTC_RC
-                16'h7044 : rd_rsp_data <= 32'h00000002; // AR_RTC_STATUS
-                16'h8000 : rd_rsp_data <= data_32;      // AR_STA_ID0
-                16'h806C : rd_rsp_data <= 32'h00000000; // AR_OBS_BUS_1
-                16'h9820 : rd_rsp_data <= data_32;      // AR_STA_ID0
-                16'h9860 : rd_rsp_data <= 32'h00000000; // ath_hal_wait
-                16'h9C00 : rd_rsp_data <= 32'h00000000; // rf claim
-                default : rd_rsp_data <= 32'hDEADBEEF;  // default value: 0xDEADBEEF
+        if (drd_req_valid) begin
+            case (({drd_req_addr[31:24], drd_req_addr[23:16], drd_req_addr[15:08], drd_req_addr[07:00]} - (base_address_register & 32'hFFFFFFF0)) & 32'h00FF)
+
+
+                16'h0000 : rd_rsp_data <= 32'hA6374E75;
+                16'h0004 : rd_rsp_data <= 32'h00000003;
+                16'h0008 : rd_rsp_data <= 32'h02000015;
+                16'h000C : rd_rsp_data <= 32'h00000010;
+                16'h0010 : rd_rsp_data <= 32'h0000F001;
+                16'h0018 : rd_rsp_data <= 32'hFCB04004;
+                16'h0020 : rd_rsp_data <= 32'hFCB00004;
+                16'h002C : rd_rsp_data <= 32'h86771043;
+                16'h0034 : rd_rsp_data <= 32'h00000040;
+                16'h003C : rd_rsp_data <= 32'h00000100;
+                16'h0040 : rd_rsp_data <= 32'hFFC35001;
+                16'h0044 : rd_rsp_data <= 32'h00000008;
+                16'h0050 : rd_rsp_data <= 32'h00807005;
+                16'h0070 : rd_rsp_data <= 32'h0202B010;
+                16'h0074 : rd_rsp_data <= 32'h00688CC0;
+                16'h0078 : rd_rsp_data <= 32'h00102010;
+                16'h007C : rd_rsp_data <= 32'h00477C11;
+                16'h0080 : rd_rsp_data <= 32'h10110040;
+                16'h0094 : rd_rsp_data <= 32'h000C081F;
+                16'h0098 : rd_rsp_data <= 32'h00000010;
+                16'h009C : rd_rsp_data <= 32'h00000002;
+                16'h00B0 : rd_rsp_data <= 32'h80030011;
+                16'h00B4 : rd_rsp_data <= 32'h00000004;
+                16'h00B8 : rd_rsp_data <= 32'h00000804;
+                16'h0100 : rd_rsp_data <= 32'h14020001;
+                16'h0108 : rd_rsp_data <= 32'h00500000;
+                16'h010C : rd_rsp_data <= 32'h00462030;
+                16'h0114 : rd_rsp_data <= 32'h00006000;
+                16'h0118 : rd_rsp_data <= 32'h000000A0;
+                16'h0140 : rd_rsp_data <= 32'h16010002;
+                16'h0154 : rd_rsp_data <= 32'h80000001;
+                16'h0160 : rd_rsp_data <= 32'h17010003;
+                16'h0164 : rd_rsp_data <= 32'h684CE000;
+                16'h0168 : rd_rsp_data <= 32'h01000000;
+                16'h0170 : rd_rsp_data <= 32'h17810018;
+                16'h0178 : rd_rsp_data <= 32'h0001001E;
+                16'h017C : rd_rsp_data <= 32'h0079961F;
+                16'h0180 : rd_rsp_data <= 32'h00000010;
+                16'h0184 : rd_rsp_data <= 32'h00000028;
+                16'h0700 : rd_rsp_data <= 32'h01630076;
+                16'h0704 : rd_rsp_data <= 32'hFFFFFFFF;
+                16'h0708 : rd_rsp_data <= 32'h07000004;
+                16'h070C : rd_rsp_data <= 32'h13FFFF01;
+                16'h0710 : rd_rsp_data <= 32'h00010120;
+                16'h0718 : rd_rsp_data <= 32'h00020000;
+                16'h071C : rd_rsp_data <= 32'h20000280;
+                16'h0728 : rd_rsp_data <= 32'h03D75C51;
+                16'h072C : rd_rsp_data <= 32'h08000110;
+                16'h0730 : rd_rsp_data <= 32'h00006040;
+                16'h0734 : rd_rsp_data <= 32'h00006006;
+                16'h0738 : rd_rsp_data <= 32'h00004020;
+                16'h073C : rd_rsp_data <= 32'h00000001;
+                16'h0740 : rd_rsp_data <= 32'h0000000F;
+                16'h0748 : rd_rsp_data <= 32'h40204008;
+                16'h074C : rd_rsp_data <= 32'h00204004;
+                16'h0750 : rd_rsp_data <= 32'h00800000;
+                16'h080C : rd_rsp_data <= 32'h00000100;
+                16'h08BC : rd_rsp_data <= 32'h00000001;
+                16'h08D4 : rd_rsp_data <= 32'h00000032;
+                16'h0B40 : rd_rsp_data <= 32'h00000019;
+                16'h0B44 : rd_rsp_data <= 32'h000000D3;
+                16'h1000 : rd_rsp_data <= 32'h00100200;
+                16'h1004 : rd_rsp_data <= 32'hF0010000;
+                16'h100C : rd_rsp_data <= 32'h40040000;
+                16'h1010 : rd_rsp_data <= 32'h0000FCB0;
+                16'h1014 : rd_rsp_data <= 32'h00040000;
+                16'h1018 : rd_rsp_data <= 32'h0000FCB0;
+                16'h1020 : rd_rsp_data <= 32'h10430000;
+                16'h1024 : rd_rsp_data <= 32'h00008677;
+                16'h1028 : rd_rsp_data <= 32'h00400000;
+                16'h1030 : rd_rsp_data <= 32'h01000000;
+                16'h1034 : rd_rsp_data <= 32'h50010000;
+                16'h1038 : rd_rsp_data <= 32'h0008FFC3;
+                16'h1044 : rd_rsp_data <= 32'h70050000;
+                16'h1048 : rd_rsp_data <= 32'h00000080;
+                16'h1064 : rd_rsp_data <= 32'hB0100000;
+                16'h1068 : rd_rsp_data <= 32'h8CC00202;
+                16'h106C : rd_rsp_data <= 32'h20100068;
+                16'h1070 : rd_rsp_data <= 32'h7C110010;
+                16'h1074 : rd_rsp_data <= 32'h00400047;
+                16'h1078 : rd_rsp_data <= 32'h00001011;
+                16'h1088 : rd_rsp_data <= 32'h081F0000;
+                16'h108C : rd_rsp_data <= 32'h0010000C;
+                16'h1090 : rd_rsp_data <= 32'h00020000;
+                16'h10A4 : rd_rsp_data <= 32'h00110000;
+                16'h10A8 : rd_rsp_data <= 32'h00048003;
+                16'h10AC : rd_rsp_data <= 32'h08040000;
+                16'h10F4 : rd_rsp_data <= 32'h00010000;
+                16'h10F8 : rd_rsp_data <= 32'h00001402;
+                16'h1100 : rd_rsp_data <= 32'h20300050;
+                16'h1104 : rd_rsp_data <= 32'h00000046;
+                16'h1108 : rd_rsp_data <= 32'h60000000;
+                16'h110C : rd_rsp_data <= 32'h00A00000;
+                16'h1134 : rd_rsp_data <= 32'h00020000;
+                16'h1138 : rd_rsp_data <= 32'h00001601;
+                16'h1148 : rd_rsp_data <= 32'h00010000;
+                16'h114C : rd_rsp_data <= 32'h00008000;
+                16'h1154 : rd_rsp_data <= 32'h00030000;
+                16'h1158 : rd_rsp_data <= 32'hE0001701;
+                16'h115C : rd_rsp_data <= 32'h0000684C;
+                16'h1160 : rd_rsp_data <= 32'h00000100;
+                16'h1164 : rd_rsp_data <= 32'h00180000;
+                16'h1168 : rd_rsp_data <= 32'h00001781;
+                16'h116C : rd_rsp_data <= 32'h001E0000;
+                16'h1170 : rd_rsp_data <= 32'h961F0001;
+                16'h1174 : rd_rsp_data <= 32'h00100079;
+                16'h1178 : rd_rsp_data <= 32'h00280000;
+                16'h16F4 : rd_rsp_data <= 32'h00760000;
+                16'h16F8 : rd_rsp_data <= 32'hFFFF0163;
+                16'h16FC : rd_rsp_data <= 32'h0004FFFF;
+                16'h1700 : rd_rsp_data <= 32'hFF010700;
+                16'h1704 : rd_rsp_data <= 32'h012013FF;
+                16'h1708 : rd_rsp_data <= 32'h00000001;
+                16'h1710 : rd_rsp_data <= 32'h02800002;
+                16'h1714 : rd_rsp_data <= 32'h00002000;
+                16'h171C : rd_rsp_data <= 32'h5C510000;
+                16'h1720 : rd_rsp_data <= 32'h011003D7;
+                16'h1724 : rd_rsp_data <= 32'h60400800;
+                16'h1728 : rd_rsp_data <= 32'h60060000;
+                16'h172C : rd_rsp_data <= 32'h40200000;
+                16'h1730 : rd_rsp_data <= 32'h00010000;
+                16'h1734 : rd_rsp_data <= 32'h000F0000;
+                16'h173C : rd_rsp_data <= 32'h40080000;
+                16'h1740 : rd_rsp_data <= 32'h40044020;
+                16'h1744 : rd_rsp_data <= 32'h00000020;
+                16'h1748 : rd_rsp_data <= 32'h00000080;
+                16'h1800 : rd_rsp_data <= 32'h01000000;
+                16'h18B0 : rd_rsp_data <= 32'h00010000;
+                16'h18C8 : rd_rsp_data <= 32'h00320000;
+                16'h1B34 : rd_rsp_data <= 32'h00190000;
+                16'h1B38 : rd_rsp_data <= 32'h00D30000;
+               default : rd_rsp_data <= 32'h00000000;
             endcase
-        else if (dwr_valid)
-            case ({dwr_addr[31:24], dwr_addr[23:16], dwr_addr[15:08], dwr_addr[07:00]} - base_address_register)
-                16'h8000 : data_32 <= dwr_data;
-                16'h9820 : data_32 <= dwr_data;
-            endcase
-        else
-            rd_rsp_data <= 32'hDEADBEEF;
+        end else begin
+		    rd_rsp_data <= 32'h00000000;
+        end
     end
-
 endmodule
-

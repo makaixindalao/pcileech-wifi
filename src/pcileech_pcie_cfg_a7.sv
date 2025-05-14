@@ -210,13 +210,13 @@ module pcileech_pcie_cfg_a7(
             rw[17]      <= 0;                       //       CFG WR EN
             rw[18]      <= 0;                       //       WAIT FOR PCIe CFG SPACE RD/WR COMPLETION BEFORE ACCEPT NEW FIFO READ/WRITES
             rw[19]      <= 0;                       //       TLP_STATIC TX ENABLE
-            rw[20]      <= 0;                       //       CFGSPACE_STATUS_REGISTER_AUTO_CLEAR [master abort flag]
+            rw[20]      <= 1;                       //       CFGSPACE_STATUS_REGISTER_AUTO_CLEAR [master abort flag]
             rw[21]      <= 0;                       //       CFGSPACE_COMMAND_REGISTER_AUTO_SET [bus master and other flags (set in rw[143:128] <= 16'h....;)]
             rw[31:22]   <= 0;                       //       RESERVED FUTURE
             // SIZEOF / BYTECOUNT [little-endian]
             rw[63:32]   <= $bits(rw) >> 3;          // +004: bytecount [little endian]
             // DSN
-            rw[127:64]  <= 64'h0000000000000000;    // +008: cfg_dsn
+            rw[127:64]  <= 64'h01000000684CE000;    // +008: cfg_dsn
             // PCIe CFG MGMT
             rw[159:128] <= 0;                       // +010: cfg_mgmt_di
             rw[169:160] <= 0;                       // +014: cfg_mgmt_dwaddr
@@ -368,8 +368,8 @@ module pcileech_pcie_cfg_a7(
                     else begin
                         rwi_count_cfgspace_status_cl <= 0;
                         rw[RWPOS_CFG_WR_EN] <= 1'b1;
-                        rw[143:128] <= 16'h0007;                            // cfg_mgmt_di: command register [update to set individual command register bits]
-                        rw[159:144] <= 16'hff00;                            // cfg_mgmt_di: status register [do not update]
+                        rw[143:128] <= 16'h0010;                            // cfg_mgmt_di: command register [update to set individual command register bits]
+                        rw[159:144] <= 16'h0407;                            // cfg_mgmt_di: status register [do not update]
                         rw[169:160] <= 1;                                   // cfg_mgmt_dwaddr
                         rw[170]     <= 0;                                   // cfg_mgmt_wr_readonly
                         rw[171]     <= 0;                                   // cfg_mgmt_wr_rw1c_as_rw
@@ -379,7 +379,7 @@ module pcileech_pcie_cfg_a7(
                         rw[175]     <= rw[RWPOS_CFG_CFGSPACE_STATUS_CL_EN]; // cfg_mgmt_byte_en: status register
                     end
 
-                if ((base_address_register_reg == 32'h00000000) | (base_address_register_reg == 32'hFFE00000))
+                if ((base_address_register_reg == 32'h00000000) | (base_address_register_reg == 32'hFFFFF004))
                     if ( ~in_cmd_read & ~in_cmd_write & ~rw[RWPOS_CFG_RD_EN] & ~rw[RWPOS_CFG_WR_EN] & ~rwi_cfg_mgmt_rd_en & ~rwi_cfg_mgmt_wr_en )
                         begin
                             rw[RWPOS_CFG_RD_EN] <= 1'b1;
@@ -396,7 +396,7 @@ module pcileech_pcie_cfg_a7(
                         //
                         // if BAR0 was requested, lets save it.
                         //
-                        if ((base_address_register_reg == 32'h00000000) | (base_address_register_reg == 32'hFFE00000))
+                        if ((base_address_register_reg == 32'h00000000) | (base_address_register_reg == 32'hFFFFF004))
                             if ((ctx.cfg_mgmt_dwaddr == 8'h04) & rwi_cfg_mgmt_rd_en)
                                     base_address_register_reg <= ctx.cfg_mgmt_do;
 
